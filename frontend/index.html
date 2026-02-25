@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PhishGuard — Real-Time Phishing URL Detection powered by Machine Learning and SHAP Explainability" />
+  <title>PhishGuard — Real-Time Phishing Detection</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- API Base URL (override for production) -->
+  <script>window.PHISHGUARD_API_BASE = 'http://localhost:8000';</script>
+</head>
+
+<body>
+
+<!-- ═══ Particle Background ════════════════════════════════════════════ -->
+<canvas id="particle-canvas"></canvas>
+
+<div class="app-wrapper">
+
+  <!-- ═══ Header ═════════════════════════════════════════════════════════ -->
+  <header class="header">
+    <a class="logo" href="#">
+      <div class="logo-icon">&#128737;</div>
+      <div>
+        <div class="logo-text">PHISHGUARD</div>
+        <div class="logo-tagline">Real-Time Threat Detection</div>
+      </div>
+    </a>
+
+    <div class="header-status">
+      <span class="status-dot"></span>
+      <span>INITIALIZING...</span>
+    </div>
+  </header>
+
+
+  <!-- ═══ Hero ════════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span>&#9679;</span>
+      <span>AI-Powered Phishing Intelligence</span>
+    </div>
+    <h1 class="hero-title">Detect Phishing URLs<br/>In Real-Time</h1>
+    <p class="hero-subtitle">
+      Powered by XGBoost, SHAP explainability, and 28+ URL features.
+      Get instant threat intelligence for any suspicious link.
+    </p>
+
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-value">≥90%</div>
+        <div class="stat-label">F1 Score</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">&lt;1s</div>
+        <div class="stat-label">Response Time</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">28+</div>
+        <div class="stat-label">Feature Signals</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">SHAP</div>
+        <div class="stat-label">Explainability</div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═══ Scanner Input ═══════════════════════════════════════════════════ -->
+  <section class="scanner-section">
+    <div class="section-label">URL Target Scanner</div>
+
+    <div class="input-group">
+      <div class="url-input-wrapper">
+        <input
+          id="url-input"
+          class="url-input"
+          type="text"
+          placeholder="https://suspicious-site.example.com/login?redirect=paypal"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span class="url-input-icon">&#128279;</span>
+      </div>
+
+      <button id="scan-btn" class="scan-btn" aria-label="Scan URL">
+        <span class="scan-btn-spinner"></span>
+        <span class="scan-btn-icon">&#9889;</span>
+        <span class="btn-text">SCAN URL</span>
+      </button>
+    </div>
+
+    <!-- Options row -->
+    <div class="scan-options">
+      <label class="toggle-label">
+        <input id="domain-toggle" type="checkbox" />
+        <span class="toggle-switch"></span>
+        Deep Scan (WHOIS + SSL — slower)
+      </label>
+
+      <div class="example-urls">
+        <span class="example-label">Try:</span>
+        <span class="example-chip" data-url="https://google.com">google.com</span>
+        <span class="example-chip" data-url="http://paypa1-secure-login.xyz/verify?user=admin">paypa1 phish</span>
+        <span class="example-chip" data-url="http://192.168.1.1/login?redirect=bankofamerica.com">IP phish</span>
+        <span class="example-chip" data-url="https://bit.ly/3phishurl">short URL</span>
+      </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="error-banner" role="alert" aria-live="polite"></div>
+
+    <!-- Scan Progress -->
+    <div id="scan-progress" class="scan-progress">
+      <div class="progress-stages">
+        <div id="stage-extract" class="stage-item pending" data-icon="○">
+          <div class="stage-icon">○</div>
+          <div class="stage-text">Extracting URL features...</div>
+          <div class="stage-spinner"></div>
+        </div>
+        <div id="stage-model" class="stage-item pending" data-icon="○">
+          <div class="stage-icon">○</div>
+          <div class="stage-text">Running ML classifier...</div>
+          <div class="stage-spinner"></div>
+        </div>
+        <div id="stage-shap" class="stage-item pending" data-icon="○">
+          <div class="stage-icon">○</div>
+          <div class="stage-text">Computing SHAP values...</div>
+          <div class="stage-spinner"></div>
+        </div>
+        <div id="stage-score" class="stage-item pending" data-icon="○">
+          <div class="stage-icon">○</div>
+          <div class="stage-text">Generating risk score...</div>
+          <div class="stage-spinner"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═══ Results Panel ═══════════════════════════════════════════════════ -->
+  <div id="results-panel" role="region" aria-label="Analysis Results">
+
+    <!-- ─── Left: Verdict Card ─────────────────────────────────────── -->
+    <div id="verdict-card" class="verdict-card">
+
+      <!-- Risk Gauge -->
+      <div class="risk-gauge-container" aria-label="Risk Score Gauge">
+        <svg class="risk-gauge-svg" viewBox="0 0 200 200">
+          <defs>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          <circle class="gauge-bg" cx="100" cy="100" r="80" />
+          <circle
+            id="gauge-fill"
+            class="gauge-fill"
+            cx="100" cy="100" r="80"
+            filter="url(#glow)"
+          />
+        </svg>
+        <div class="gauge-center-content">
+          <div id="risk-score-number" class="risk-score-number">0</div>
+          <div class="risk-score-label">Risk Score</div>
+        </div>
+      </div>
+
+      <!-- Verdict Badge -->
+      <div id="verdict-badge" class="verdict-badge legitimate">
+        <span id="verdict-icon" class="verdict-icon">✓</span>
+        <span id="verdict-text">Scanning...</span>
+      </div>
+
+      <!-- Confidence Bar -->
+      <div class="confidence-section">
+        <div class="confidence-header">
+          <span>Confidence</span>
+          <span id="confidence-val" class="confidence-value">—</span>
+        </div>
+        <div class="bar-track">
+          <div id="confidence-bar" class="bar-fill legitimate" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Meta Info -->
+      <div class="verdict-meta">
+        <div class="meta-row">
+          <span class="meta-key">Model</span>
+          <span class="meta-val" id="model-used">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">Latency</span>
+          <span class="meta-val" id="latency-val">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-key">Scanned</span>
+          <span class="meta-val" id="timestamp-val">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Right: Details Panel ───────────────────────────────────── -->
+    <div class="details-panel">
+
+      <!-- URL Breakdown -->
+      <div class="detail-card">
+        <div class="card-title">&#128279; URL Breakdown</div>
+        <div id="url-display" class="url-display">—</div>
+        <div id="url-parts" class="url-parts"></div>
+      </div>
+
+      <!-- Threat Indicators Grid -->
+      <div class="detail-card">
+        <div class="card-title">&#128737; Threat Indicators</div>
+        <div id="threat-grid" class="threat-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- SHAP Explanations -->
+      <div class="detail-card">
+        <div class="card-title">&#129504; AI Explanation (SHAP)</div>
+        <div id="explanations-list" class="explanations-list">
+          <div class="explanation-item safe">
+            <span class="exp-icon">&#128269;</span>
+            <span>Awaiting analysis...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature Importance -->
+      <div class="detail-card">
+        <div class="card-title">&#128202; Top Feature Signals</div>
+        <div id="feature-bars" class="feature-bars">
+          <div style="color:var(--text-muted);font-size:13px;">Awaiting analysis...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ═══ Scan History ════════════════════════════════════════════════════ -->
+  <section id="history-section" class="history-section" aria-label="Scan History">
+    <div class="section-label">Scan History</div>
+    <table class="history-table" role="table">
+      <thead>
+        <tr>
+          <th>URL</th>
+          <th>Verdict</th>
+          <th>Risk</th>
+          <th>Confidence</th>
+          <th>Time</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="history-body">
+      </tbody>
+    </table>
+  </section>
+
+
+  <!-- ═══ Footer ══════════════════════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-brand mono">
+      &#169; 2025 PhishGuard &mdash; Real-Time Phishing Detection
+    </div>
+    <nav class="footer-links" aria-label="Footer links">
+      <a href="/docs" target="_blank" rel="noopener">API Docs</a>
+      <a href="/redoc" target="_blank" rel="noopener">ReDoc</a>
+      <a href="#" onclick="localStorage.removeItem('pg_history'); location.reload();">Clear History</a>
+    </nav>
+  </footer>
+
+</div><!-- /app-wrapper -->
+
+<script src="js/app.js"></script>
+</body>
+</html>
