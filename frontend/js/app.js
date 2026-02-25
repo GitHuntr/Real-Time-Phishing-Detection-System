@@ -342,13 +342,15 @@ document.addEventListener('keydown', e => {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SCAN MODE TABS (Single / Batch)
+// SCAN MODE TABS (Single / Batch / Upload)
 // ═══════════════════════════════════════════════════════════════════════════
 
 (function initScanTabs() {
-  const tabs      = document.querySelectorAll('.mode-tab');
+  const tabs       = document.querySelectorAll('.mode-tab');
   const modeSingle = $('mode-single');
   const modeBatch  = $('mode-batch');
+  const modeUpload = $('mode-upload');
+  const optsRow    = $('scan-options-row');
   if (!tabs.length) return;
 
   tabs.forEach(tab => {
@@ -358,6 +360,8 @@ document.addEventListener('keydown', e => {
       const mode = tab.dataset.mode;
       if (modeSingle) modeSingle.classList.toggle('hidden', mode !== 'single');
       if (modeBatch)  modeBatch.classList.toggle('hidden',  mode !== 'batch');
+      if (modeUpload) modeUpload.classList.toggle('hidden', mode !== 'upload');
+      if (optsRow)    optsRow.classList.toggle('upload-mode', mode === 'upload');
     });
   });
 })();
@@ -476,7 +480,7 @@ async function startBatchScan() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls }),
-      signal: AbortSignal.timeout(60000),
+      signal: abortTimeout(60000),
     });
 
     if (!resp.ok) {
@@ -508,7 +512,7 @@ function renderBatchResults(container, results) {
   container.innerHTML = results.map((r, i) => `
     <div class="batch-result-row ${r.prediction || 'error-row'}" style="animation-delay:${i * 40}ms">
       <div class="mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeAttr(r.url)}">${escapeHTML(truncate(r.url, 60))}</div>
-      <div><span class="badge-tiny ${r.prediction || ''}">${verdictLabels[r.prediction] || r.prediction.toUpperCase()}</span></div>
+      <div><span class="badge-tiny ${r.prediction || 'error'}">${verdictLabels[r.prediction] || (r.prediction || 'error').toUpperCase()}</span></div>
       <div class="mono" style="font-size:12px;">${r.risk_score >= 0 ? r.risk_score + '/100' : '—'}</div>
       <div class="mono" style="font-size:12px;">${r.confidence ? r.confidence.toFixed(1) + '%' : '—'}</div>
     </div>
@@ -525,7 +529,7 @@ async function fetchPrediction(url, includeDomain = false) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, include_domain_features: includeDomain }),
-    signal: AbortSignal.timeout(30000),
+    signal: abortTimeout(30000),
   });
 
   if (!resp.ok) {
@@ -891,6 +895,15 @@ function animateNumber(el, from, to, duration) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function abortTimeout(ms) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms);
+  }
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
+}
+
 function escapeHTML(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -946,3 +959,313 @@ function truncate(str, max) {
       showToast('API server unreachable — start the backend', 'error', 6000);
     });
 })();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARALLAX — hero moves at a slower rate on scroll
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initParallax() {
+  const parallaxEls = document.querySelectorAll('[data-parallax]');
+  if (!parallaxEls.length) return;
+
+  window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    parallaxEls.forEach(el => {
+      // Wait for reveal animation to complete before applying parallax
+      if (el.classList.contains('reveal') && !el.classList.contains('visible')) return;
+      const factor = parseFloat(el.dataset.parallax) || 0.2;
+      el.style.transform = `translateY(${scrollY * factor}px)`;
+    });
+  }, { passive: true });
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3D TILT CARDS
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initTiltCards() {
+  const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+
+  function onMove(e) {
+    if (isMobile()) return;
+    const card   = e.currentTarget;
+    const rect   = card.getBoundingClientRect();
+    const cx     = rect.left + rect.width  / 2;
+    const cy     = rect.top  + rect.height / 2;
+    const dx     = (e.clientX - cx) / (rect.width  / 2);
+    const dy     = (e.clientY - cy) / (rect.height / 2);
+    const rotX   = -dy * 6;
+    const rotY   =  dx * 6;
+    card.style.transform = `perspective(800px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.015)`;
+  }
+
+  function onLeave(e) {
+    e.currentTarget.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
+  }
+
+  document.querySelectorAll('.tilt-card').forEach(card => {
+    card.addEventListener('mousemove', onMove, { passive: true });
+    card.addEventListener('mouseleave', onLeave, { passive: true });
+  });
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RIPPLE EFFECT on .ripple-btn buttons
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initRipple() {
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.ripple-btn');
+    if (!btn) return;
+
+    const rect    = btn.getBoundingClientRect();
+    const x       = e.clientX - rect.left;
+    const y       = e.clientY - rect.top;
+    const size    = Math.max(rect.width, rect.height) * 1.5;
+    const wave    = document.createElement('span');
+    wave.className = 'ripple-wave';
+    wave.style.cssText = `
+      width: ${size}px; height: ${size}px;
+      left: ${x - size / 2}px; top: ${y - size / 2}px;
+    `;
+    btn.appendChild(wave);
+    wave.addEventListener('animationend', () => wave.remove(), { once: true });
+  });
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILE UPLOAD FEATURE
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initFileUpload() {
+  const zone         = $('upload-zone');
+  const fileInput    = $('upload-file-input');
+  const fileInfo     = $('upload-file-info');
+  const filenameEl   = $('upload-filename');
+  const filesizeEl   = $('upload-filesize');
+  const clearBtn     = $('upload-clear-btn');
+  const scanBtn      = $('upload-scan-btn');
+  const progressWrap = $('upload-progress-wrap');
+  const progressBar  = $('upload-progress-bar');
+  const progressLbl  = $('upload-progress-label');
+  const progressPct  = $('upload-progress-pct');
+  const summaryEl    = $('upload-summary');
+  const resultsEl    = $('upload-results');
+  const tbodyEl      = $('upload-tbody');
+  const countEl      = $('upload-results-count');
+  const exportBtn    = $('upload-export-btn');
+
+  let uploadedFile   = null;
+  let lastUploadData = null;
+
+  if (!zone) return;
+
+  // ── Open file picker ───────────────────────────────────────────────────
+  zone.addEventListener('click', e => {
+    if (e.target === fileInput) return;
+    fileInput && fileInput.click();
+  });
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput && fileInput.click(); } });
+
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+  }
+
+  // ── Drag and drop ──────────────────────────────────────────────────────
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer && e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  // ── Clear file ─────────────────────────────────────────────────────────
+  if (clearBtn) {
+    clearBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      resetUpload();
+    });
+  }
+
+  // ── Scan button ────────────────────────────────────────────────────────
+  if (scanBtn) {
+    scanBtn.addEventListener('click', startUploadScan);
+  }
+
+  // ── Export CSV ─────────────────────────────────────────────────────────
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportUploadCSV);
+  }
+
+  // ── Set file ────────────────────────────────────────────────────────────
+  function setFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['txt', 'csv'].includes(ext)) {
+      showToast('Only .txt and .csv files are supported', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('File exceeds 5 MB limit', 'error');
+      return;
+    }
+
+    uploadedFile = file;
+
+    // Show file info
+    if (zone)      zone.classList.add('hidden');
+    if (fileInfo)  fileInfo.classList.remove('hidden');
+    if (filenameEl) filenameEl.textContent = file.name;
+    if (filesizeEl) filesizeEl.textContent = formatFileSize(file.size);
+    if (scanBtn)    scanBtn.classList.remove('hidden');
+
+    // Reset results
+    hideUploadResults();
+  }
+
+  // ── Reset ────────────────────────────────────────────────────────────────
+  function resetUpload() {
+    uploadedFile = null;
+    if (fileInput) fileInput.value = '';
+    if (zone)      zone.classList.remove('hidden');
+    if (fileInfo)  fileInfo.classList.add('hidden');
+    if (scanBtn)   scanBtn.classList.add('hidden');
+    hideUploadResults();
+  }
+
+  function hideUploadResults() {
+    if (progressWrap) progressWrap.classList.add('hidden');
+    if (summaryEl)    summaryEl.classList.add('hidden');
+    if (resultsEl)    resultsEl.classList.add('hidden');
+    if (progressBar)  progressBar.style.width = '0%';
+  }
+
+  // ── Start scan ───────────────────────────────────────────────────────────
+  async function startUploadScan() {
+    if (!uploadedFile) return;
+
+    scanBtn.disabled = true;
+    scanBtn.classList.add('loading');
+
+    if (progressWrap) progressWrap.classList.remove('hidden');
+    if (summaryEl)    summaryEl.classList.add('hidden');
+    if (resultsEl)    resultsEl.classList.add('hidden');
+    setUploadProgress(0, 'Uploading file…');
+
+    const formData = new FormData();
+    formData.append('file', uploadedFile);
+
+    try {
+      let fakePct = 0;
+      const progressTick = setInterval(() => {
+        fakePct = Math.min(fakePct + 3, 60);
+        setUploadProgress(fakePct, 'Scanning URLs…');
+      }, 150);
+
+      const resp = await fetch(`${API_BASE}/predict/upload`, {
+        method: 'POST',
+        body:   formData,
+        signal: abortTimeout(120000),
+      });
+
+      clearInterval(progressTick);
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      lastUploadData = data;
+
+      setUploadProgress(100, 'Complete');
+      await sleep(300);
+      renderUploadResults(data);
+      showToast(
+        `Scan complete — ${data.threat_count} threat${data.threat_count !== 1 ? 's' : ''} in ${data.total} URLs`,
+        data.threat_count > 0 ? 'warn' : 'success'
+      );
+    } catch (err) {
+      if (progressWrap) progressWrap.classList.add('hidden');
+      showToast(err.message || 'Upload scan failed', 'error');
+    } finally {
+      scanBtn.disabled = false;
+      scanBtn.classList.remove('loading');
+    }
+  }
+
+  // ── Render results ───────────────────────────────────────────────────────
+  function renderUploadResults(data) {
+    const stats = data.stats || {};
+    const byId  = id => document.getElementById(id);
+    if (byId('us-total'))     animateNumber(byId('us-total'),     0, data.total,              800);
+    if (byId('us-phishing'))  animateNumber(byId('us-phishing'),  0, stats.phishing  || 0,    800);
+    if (byId('us-suspicious'))animateNumber(byId('us-suspicious'),0, stats.suspicious || 0,   800);
+    if (byId('us-safe'))      animateNumber(byId('us-safe'),      0, stats.legitimate || 0,   800);
+    if (summaryEl) summaryEl.classList.remove('hidden');
+
+    if (!tbodyEl) return;
+    const verdictLabels = {
+      phishing:  '⚠ PHISHING',
+      suspicious:'⚡ SUSPICIOUS',
+      legitimate:'✓ SAFE',
+      error:     '— ERROR',
+    };
+    tbodyEl.innerHTML = (data.results || []).map((r, i) => `
+      <tr class="row-${r.prediction || 'error'}">
+        <td class="mono" style="color:var(--text-muted);font-size:11px;">${i + 1}</td>
+        <td class="url-col" title="${escapeAttr(r.url)}">${escapeHTML(truncate(r.url, 65))}</td>
+        <td><span class="badge-tiny ${r.prediction || ''}">${verdictLabels[r.prediction] || (r.prediction || 'error').toUpperCase()}</span></td>
+        <td class="mono" style="font-size:12px;">${r.risk_score >= 0 ? r.risk_score + '/100' : '—'}</td>
+        <td class="mono" style="font-size:12px;">${r.confidence ? r.confidence.toFixed(1) + '%' : '—'}</td>
+      </tr>
+    `).join('');
+
+    if (countEl)  countEl.textContent = `${data.total} URLs scanned — ${data.threat_count} threats detected`;
+    if (resultsEl) resultsEl.classList.remove('hidden');
+  }
+
+  // ── Export CSV ────────────────────────────────────────────────────────────
+  function exportUploadCSV() {
+    if (!lastUploadData) return;
+    const rows = [['#', 'URL', 'Verdict', 'Risk Score', 'Confidence']];
+    (lastUploadData.results || []).forEach((r, i) => {
+      rows.push([
+        i + 1, r.url,
+        r.risk_level || r.prediction,
+        r.risk_score,
+        r.confidence ? r.confidence.toFixed(1) + '%' : '',
+      ]);
+    });
+    const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `phishguard_upload_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported as CSV', 'success');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function setUploadProgress(pct, label) {
+    if (progressBar) progressBar.style.width = `${pct}%`;
+    if (progressPct) progressPct.textContent  = `${Math.round(pct)}%`;
+    if (progressLbl) progressLbl.textContent  = label || '';
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024)        return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+})();
+

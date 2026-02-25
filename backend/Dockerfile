@@ -9,20 +9,27 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
 
-# Copy application
+# Copy application source
 COPY . .
 
 # Create models directory
 RUN mkdir -p models
 
+# Non-root user for security
+RUN addgroup --system phishguard \
+ && adduser  --system --ingroup phishguard phishguard \
+ && chown -R phishguard:phishguard /app
+USER phishguard
+
 # Expose port
 EXPOSE 8000
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
-# Run
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Run (production: 2 workers, no reload)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-access-log"]

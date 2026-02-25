@@ -22,6 +22,13 @@
 <!-- Particle Background -->
 <canvas id="particle-canvas"></canvas>
 
+<!-- Aurora Background -->
+<div class="aurora" aria-hidden="true">
+  <div class="aurora-band aurora-band-1"></div>
+  <div class="aurora-band aurora-band-2"></div>
+  <div class="aurora-band aurora-band-3"></div>
+</div>
+
 <!-- Toast notification area -->
 <div id="toast-container" aria-live="polite"></div>
 
@@ -32,7 +39,7 @@
     <a class="logo" href="#">
       <div class="logo-icon">&#128737;</div>
       <div>
-        <div class="logo-text">PHISHGUARD</div>
+        <div class="logo-text glitch" data-text="PHISHGUARD">PHISHGUARD</div>
         <div class="logo-tagline">Real-Time Threat Detection</div>
       </div>
     </a>
@@ -60,13 +67,13 @@
 
 
   <!-- ═══ Hero ════════════════════════════════════════════════════════════ -->
-  <section class="hero reveal">
+  <section class="hero reveal" data-parallax="0.25">
     <div class="hero-badge">
       <span class="badge-dot"></span>
       <span>AI-Powered Phishing Intelligence</span>
     </div>
     <h1 class="hero-title">
-      Detect <span class="gradient-text">Phishing URLs</span><br/>In Real-Time
+      Detect <span class="gradient-text gradient-text-anim">Phishing URLs</span><br/>In Real-Time
     </h1>
     <p class="hero-subtitle">
       <span id="typewriter"></span><span class="typewriter-cursor">|</span>
@@ -104,28 +111,28 @@
   <section class="how-it-works reveal">
     <div class="section-label">How It Works</div>
     <div class="how-steps">
-      <div class="how-step reveal-delay-1">
+      <div class="how-step reveal-delay-1 tilt-card">
         <div class="step-num">01</div>
         <div class="step-icon">&#128279;</div>
         <div class="step-title">URL Input</div>
         <div class="step-desc">Paste any URL — shortened links, IP-based, or suspicious domains</div>
       </div>
       <div class="step-connector"></div>
-      <div class="how-step reveal-delay-2">
+      <div class="how-step reveal-delay-2 tilt-card">
         <div class="step-num">02</div>
         <div class="step-icon">&#9881;</div>
         <div class="step-title">Feature Extraction</div>
         <div class="step-desc">28+ lexical &amp; domain features extracted in milliseconds</div>
       </div>
       <div class="step-connector"></div>
-      <div class="how-step reveal-delay-3">
+      <div class="how-step reveal-delay-3 tilt-card">
         <div class="step-num">03</div>
         <div class="step-icon">&#129504;</div>
         <div class="step-title">ML Classification</div>
         <div class="step-desc">XGBoost / Random Forest model scores phishing probability</div>
       </div>
       <div class="step-connector"></div>
-      <div class="how-step reveal-delay-4">
+      <div class="how-step reveal-delay-4 tilt-card">
         <div class="step-num">04</div>
         <div class="step-icon">&#128202;</div>
         <div class="step-title">SHAP Explanation</div>
@@ -139,10 +146,14 @@
   <section class="scanner-section reveal" id="scanner">
     <div class="section-label">URL Target Scanner</div>
 
-    <!-- Batch toggle -->
+    <!-- Scan mode tabs -->
     <div class="scan-mode-tabs">
       <button class="mode-tab active" id="tab-single" data-mode="single">Single URL</button>
       <button class="mode-tab" id="tab-batch" data-mode="batch">Batch Scan</button>
+      <button class="mode-tab upload-tab" id="tab-upload" data-mode="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;vertical-align:middle"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        File Upload
+      </button>
     </div>
 
     <!-- Single URL mode -->
@@ -161,7 +172,7 @@
           <button class="input-clear-btn" id="clear-input-btn" title="Clear" aria-label="Clear input">&#10005;</button>
         </div>
 
-        <button id="scan-btn" class="scan-btn" aria-label="Scan URL">
+        <button id="scan-btn" class="scan-btn ripple-btn" aria-label="Scan URL">
           <span class="scan-btn-spinner"></span>
           <span class="scan-btn-icon">&#9889;</span>
           <span class="btn-text">SCAN</span>
@@ -177,15 +188,104 @@
         placeholder="Paste one URL per line (max 10)&#10;https://example1.com&#10;http://suspicious-site.xyz/login&#10;..."
         rows="5"
       ></textarea>
-      <button id="batch-scan-btn" class="scan-btn" style="margin-top:12px;">
+      <button id="batch-scan-btn" class="scan-btn ripple-btn" style="margin-top:12px;">
+        <span class="scan-btn-spinner"></span>
         <span class="scan-btn-icon">&#9889;</span>
         <span class="btn-text">SCAN ALL</span>
       </button>
       <div id="batch-results" class="batch-results hidden"></div>
     </div>
 
+    <!-- File Upload mode -->
+    <div id="mode-upload" class="hidden">
+      <div id="upload-zone" class="upload-zone" role="button" tabindex="0" aria-label="Upload file">
+        <input type="file" id="upload-file-input" accept=".txt,.csv" style="display:none" />
+        <div class="upload-zone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 11l-4-4-4 4M12 7v9"/>
+          </svg>
+        </div>
+        <div class="upload-zone-title">Drop your file here</div>
+        <div class="upload-zone-sub">or <span class="upload-zone-link">click to browse</span></div>
+        <div class="upload-zone-hint">
+          <span class="upload-badge">.txt</span>
+          <span class="upload-badge">.csv</span>
+          &nbsp;· up to 500 URLs · max 5 MB
+        </div>
+      </div>
+
+      <!-- selected file info -->
+      <div id="upload-file-info" class="upload-file-info hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span id="upload-filename" class="mono"></span>
+        <span id="upload-filesize" class="upload-filesize"></span>
+        <button id="upload-clear-btn" class="upload-clear-btn" title="Remove file">&#10005;</button>
+      </div>
+
+      <!-- progress bar -->
+      <div id="upload-progress-wrap" class="upload-progress-wrap hidden">
+        <div class="upload-progress-header">
+          <span id="upload-progress-label" class="mono" style="font-size:12px;color:var(--text-secondary)">Scanning…</span>
+          <span id="upload-progress-pct" class="mono" style="font-size:12px;color:var(--neon-cyan)">0%</span>
+        </div>
+        <div class="upload-progress-track">
+          <div id="upload-progress-bar" class="upload-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- summary stats -->
+      <div id="upload-summary" class="upload-summary hidden">
+        <div class="upload-stat-card upload-stat-total">
+          <div class="upload-stat-num" id="us-total">0</div>
+          <div class="upload-stat-lbl">Total</div>
+        </div>
+        <div class="upload-stat-card upload-stat-phish">
+          <div class="upload-stat-num" id="us-phishing">0</div>
+          <div class="upload-stat-lbl">Phishing</div>
+        </div>
+        <div class="upload-stat-card upload-stat-susp">
+          <div class="upload-stat-num" id="us-suspicious">0</div>
+          <div class="upload-stat-lbl">Suspicious</div>
+        </div>
+        <div class="upload-stat-card upload-stat-safe">
+          <div class="upload-stat-num" id="us-safe">0</div>
+          <div class="upload-stat-lbl">Safe</div>
+        </div>
+      </div>
+
+      <!-- results table -->
+      <div id="upload-results" class="upload-results hidden">
+        <div class="upload-results-header">
+          <span id="upload-results-count" class="mono" style="font-size:12px;color:var(--text-secondary)"></span>
+          <button id="upload-export-btn" class="ghost-btn" style="font-size:11px;">Export CSV</button>
+        </div>
+        <div class="upload-table-wrap">
+          <table class="upload-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>URL</th>
+                <th>Verdict</th>
+                <th>Risk</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="upload-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button id="upload-scan-btn" class="scan-btn ripple-btn hidden" style="margin-top:12px;">
+        <span class="scan-btn-spinner"></span>
+        <span class="scan-btn-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <span class="btn-text">SCAN FILE</span>
+      </button>
+    </div>
+
     <!-- Options row -->
-    <div class="scan-options">
+    <div class="scan-options" id="scan-options-row">
       <label class="toggle-label">
         <input id="domain-toggle" type="checkbox" />
         <span class="toggle-switch"></span>
@@ -240,7 +340,7 @@
   <div id="results-panel" role="region" aria-label="Analysis Results">
 
     <!-- ─── Left: Verdict Card ─────────────────────────────────────── -->
-    <div id="verdict-card" class="verdict-card">
+    <div id="verdict-card" class="verdict-card tilt-card">
 
       <!-- Risk Gauge -->
       <div class="risk-gauge-container" aria-label="Risk Score Gauge">
@@ -298,11 +398,11 @@
 
       <!-- Actions -->
       <div class="verdict-actions">
-        <button class="action-btn" id="export-btn" title="Export report as JSON">
+        <button class="action-btn ripple-btn" id="export-btn" title="Export report as JSON">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export JSON
         </button>
-        <button class="action-btn" id="copy-result-btn" title="Copy result summary">
+        <button class="action-btn ripple-btn" id="copy-result-btn" title="Copy result summary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           Copy
         </button>
@@ -313,7 +413,7 @@
     <div class="details-panel">
 
       <!-- URL Breakdown -->
-      <div class="detail-card">
+      <div class="detail-card tilt-card">
         <div class="card-title">
           <span>&#128279; URL Breakdown</span>
           <button class="card-action-btn" id="copy-url-btn" title="Copy URL">
@@ -326,13 +426,13 @@
       </div>
 
       <!-- Threat Indicators Grid -->
-      <div class="detail-card">
+      <div class="detail-card tilt-card">
         <div class="card-title">&#128737; Threat Indicators</div>
         <div id="threat-grid" class="threat-grid"></div>
       </div>
 
       <!-- SHAP Explanations -->
-      <div class="detail-card">
+      <div class="detail-card tilt-card">
         <div class="card-title">&#129504; AI Explanation (SHAP)</div>
         <div id="explanations-list" class="explanations-list">
           <div class="explanation-item safe">
@@ -343,7 +443,7 @@
       </div>
 
       <!-- Feature Importance -->
-      <div class="detail-card">
+      <div class="detail-card tilt-card">
         <div class="card-title">&#128202; Top Feature Signals</div>
         <div id="feature-bars" class="feature-bars">
           <div style="color:var(--text-muted);font-size:13px;">Awaiting analysis...</div>
@@ -401,8 +501,8 @@
       <div class="cap-text">Sub-second Inference</div>
     </div>
     <div class="cap-item">
-      <div class="cap-icon">&#128279;</div>
-      <div class="cap-text">URL Shortener Detection</div>
+      <div class="cap-icon">&#128196;</div>
+      <div class="cap-text">File Batch Upload</div>
     </div>
   </section>
 
@@ -432,8 +532,8 @@
       <div class="kbd-row"><kbd>/</kbd> <span>Focus URL input</span></div>
       <div class="kbd-row"><kbd>Enter</kbd> <span>Scan URL</span></div>
       <div class="kbd-row"><kbd>Esc</kbd> <span>Clear input</span></div>
-      <div class="kbd-row"><kbd>Ctrl</kbd>+<kbd>E</kbd> <span>Export last result</span></div>
-      <div class="kbd-row"><kbd>Ctrl</kbd>+<kbd>C</kbd> <span>Copy last result (in results panel)</span></div>
+      <div class="kbd-row"><kbd>Ctrl</kbd>+<kbd>E</kbd> <span>Export last result as JSON</span></div>
+      <div class="kbd-row"><kbd>Ctrl</kbd>+<kbd>/</kbd> <span>Open this shortcuts panel</span></div>
     </div>
   </div>
 </div>

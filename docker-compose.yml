@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  phishguard:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: phishguard-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - RELOAD=false
+    volumes:
+      - ./backend/models:/app/models
+      - ./frontend:/app/../frontend:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  nginx:
+    image: nginx:alpine
+    container_name: phishguard-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend:/srv/frontend:ro
+    depends_on:
+      - phishguard
+
+volumes: {}
