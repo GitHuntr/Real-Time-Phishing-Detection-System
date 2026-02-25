@@ -110,6 +110,7 @@ class FeatureDetail(BaseModel):
 
 class PredictResponse(BaseModel):
     url: str
+    normalized_url: str = ""
     prediction: str
     confidence: float
     risk_score: int
@@ -117,6 +118,7 @@ class PredictResponse(BaseModel):
     risk_color: str
     explanations: List[str]
     top_features: List[dict]
+    features: dict = {}
     model_used: str
     latency_ms: float
     timestamp: str
